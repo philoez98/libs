@@ -14,6 +14,8 @@
     Additionally you can define, before including this header:
         #define TOKENIZER_STATIC
     to have all functions declared as static.
+        #define TOKENIZER_LOG_ERRORS
+    to print all errors to stderr.
 
         
     Example usage:
@@ -49,7 +51,7 @@
 
 #include <stdlib.h> // For strtoll and strtof
 
-#ifdef TOKENIZER_LOG_PARSE_ERRORS
+#ifdef TOKENIZER_LOG_ERRORS
 #include <stdio.h>
 #endif
 
@@ -160,7 +162,7 @@ TOKENIZER_DEF bool Parsing(tokenizer *Tokenizer);
 
 #ifdef TOKENIZER_IMPLEMENTATION
 
-#ifdef TOKENIZER_LOG_PARSE_ERRORS
+#ifdef TOKENIZER_LOG_ERRORS
 static const char* TokenTypes[TOKEN_TYPE_COUNT]{
     "TOKEN_UNKNOWN",
     "TOKEN_IDENT",
@@ -540,7 +542,7 @@ TOKENIZER_DEF bool RequireToken(tokenizer* Tokenizer, token_type Type, token* Re
 
     if (Token.Type != Type) {
         Tokenizer->Error = true;
-#ifdef TOKENIZER_LOG_PARSE_ERRORS
+#ifdef TOKENIZER_LOG_ERRORS
         fprintf(stderr, "Token type mismatch at line %d: required token type is %s but current token type is %s.\n", Tokenizer->Line, TokenTypes[Type], TokenTypes[Token.Type]);
 #endif
         return false;
@@ -555,7 +557,7 @@ TOKENIZER_DEF bool RequireToken(tokenizer* Tokenizer, token_type Type, token* Re
 
 TOKENIZER_DEF void SetError(tokenizer *Tokenizer, const char* Message) {
     Tokenizer->Error = true;
-#ifdef TOKENIZER_LOG_PARSE_ERRORS
+#ifdef TOKENIZER_LOG_ERRORS
     fprintf(stderr, "Error at line %d: %s.\n", Tokenizer->Line, Message);
 #endif
 }
