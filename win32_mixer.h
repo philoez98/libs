@@ -364,14 +364,6 @@ WIN32_MIXER_DEF bool InitMixer(sound_mixer* Mixer) {
         return false;
     }
 
-/*
-#ifdef DEBUG_MODE
-    XAUDIO2_DEBUG_CONFIGURATION Config;
-    Config.TraceMask = XAUDIO2_LOG_ERRORS | XAUDIO2_LOG_WARNINGS | XAUDIO2_LOG_DETAIL;
-    Handle->SetDebugConfiguration(&Config);
-#endif
-*/
-
     if (FAILED(Mixer->Handle->CreateMasteringVoice(&Mixer->MasterVoice, DEFAULT_SOUND_CHANNELS, DEFAULT_SOUND_SAMPLES_PER_SEC))) {
         RELEASE_AND_ZERO(Mixer->Handle);
         return false;
@@ -626,6 +618,10 @@ static void Mix(sound_mixer* Mixer, uint32 SamplesToMix = 0) {
             if (Stream->SamplesPlayed >= Stream->SamplesToPlay) {
                 Stream->SamplesPlayed = 0;
                 Mixer->SamplesMixed[Stream->Index] = 0;
+
+                if (Stream->SoundFlags & SOUND_FADE_OUT) {
+                    EndFade(Stream);
+                }
             }
         }
 
@@ -675,22 +671,26 @@ static DWORD WINAPI AudioThreadProc(void* Data) {
         XAUDIO2_VOICE_STATE State;
         Mixer->SourceVoice->GetState(&State);
 
-        while (State.BuffersQueued < SOUND_STREAM_BUFFER_COUNT)
         {
-            Mixer->SoundBuffer = (int16*)SoundOutputBuffers[BufferIndex];
-            Mix(Mixer, SamplesToMix);
+            scoped_lock Lock(Mixer->AudioMutex);
+            while (State.BuffersQueued < SOUND_STREAM_BUFFER_COUNT)
+            {
+                    Mixer->SoundBuffer = (int16*)SoundOutputBuffers[BufferIndex];
+                    Mix(Mixer, SamplesToMix);
 
-            XAUDIO2_BUFFER Info;
-            ZeroStruct(Info);
-            Info.AudioBytes = SOUND_STREAM_BUFFER_SIZE;
-            Info.pAudioData = (uint8*)Mixer->SoundBuffer;
+                    XAUDIO2_BUFFER Info;
+                    ZeroStruct(Info);
+                    Info.AudioBytes = SOUND_STREAM_BUFFER_SIZE;
+                    Info.pAudioData = (uint8*)Mixer->SoundBuffer;
 
-            auto Result = Mixer->SourceVoice->SubmitSourceBuffer(&Info);
-            assert(Result == S_OK);
+                    auto Result = Mixer->SourceVoice->SubmitSourceBuffer(&Info);
+                    assert(Result == S_OK);
 
-            BufferIndex = (BufferIndex + 1) & (SOUND_STREAM_BUFFER_COUNT - 1);
-            Mixer->SourceVoice->GetState(&State);
+                    BufferIndex = (BufferIndex + 1) & (SOUND_STREAM_BUFFER_COUNT - 1);
+                    Mixer->SourceVoice->GetState(&State);
+             }
         }
+        
         WaitForSingleObject(Mixer->EndOfBufferEvent, INFINITE);
     }
 
