@@ -106,7 +106,7 @@
         InitMixer(&Mixer);
 
         unsigned int AudioBufferSize = 0;
-        unsigned char* AudioBuffer = LoadWAV("C:\\Users\\Filo\\Desktop\\gattaca2.wav", &AudioBufferSize);
+        unsigned char* AudioBuffer = LoadWAV("path/to/file", &AudioBufferSize);
 
         if (!AudioBuffer) {
            QuitMixer(&Mixer);
