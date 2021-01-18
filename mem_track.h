@@ -113,9 +113,13 @@ MEM_TRACK_DEF void* MTRealloc(void* Ptr, uint64 Size);
 MEM_TRACK_DEF void MTFree(void* Ptr);
 
 MEM_TRACK_DEF uint64 MTGetUsedMemory();
+
+// Prints the amount of memory allocated at the provided address
 MEM_TRACK_DEF uint64 MTGetAddressSize(void* Ptr);
+    
 MEM_TRACK_DEF uint64 MTGetLeakedMemory();
 MEM_TRACK_DEF mem_usage_info* MTGetMemoryUsage();
+    
 MEM_TRACK_DEF float MTGetAvgAllocationSize();
 
 #ifdef MEM_TRACK_ENABLE_STACKTRACE
@@ -318,7 +322,7 @@ MEM_TRACK_DEF void MTPrintFullStackTrace() {
 
         MTPRINT("  - Allocated %lluB (%.2fKB) at %p\n", Node->Size, Node->Size / 1024.f, (uint8*)Node + sizeof(mem_node));
 
-        for (uint8 i = 0; i < Node->StackTraceCount; ++i) {
+        for (int i = 0; i < Node->StackTraceCount; ++i) {
             void* Trace = Node->StackTrace[i];
 
             DWORD Disp;
