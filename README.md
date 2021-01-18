@@ -1,6 +1,6 @@
 # libs
 
-Personal single header, STB-style libraries for C/C++.
+Single header, STB-style libraries for C/C++. Mostly used in personal projects.
 
 |library | category | LoC | license | description
 | --------------------- | -------- | --- | ---------- | --------------------------------
