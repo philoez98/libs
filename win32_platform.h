@@ -1,7 +1,12 @@
 #pragma once
 
 #include <Windows.h>
+
+#ifndef USE_D2D1_API
 #include <d3d11.h>
+#else
+#include <d2d1.h>
+#endif
 
 struct window
 {
@@ -31,6 +36,8 @@ void PumpWindowMessages(window* Window);
 
 struct gpu_context
 {
+
+#ifndef USE_D2D1_API
     ID3D11Device* Device;
     ID3D11DeviceContext* DeviceContext;
 
@@ -38,6 +45,10 @@ struct gpu_context
     ID3D11RenderTargetView* BackBuffer;
     
     D3D_FEATURE_LEVEL FeatureLevel;
+#else
+    ID2D1Factory* Factory;
+    ID2D1HwndRenderTarget* RenderTarget;
+#endif
 
     int IsInitialized;
     int UseSRGBFormat;
@@ -56,8 +67,13 @@ void DestroyGraphics(gpu_context* Context);
 #include <assert.h>
 #include <string.h>
 
+
+#ifndef USE_D2D1_API
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
+#else
+#pragma comment(lib, "d2d1.lib")
+#endif
 
 #ifndef ZeroStruct
 #define ZeroStruct(s) memset(&(s), 0, sizeof(s))
@@ -166,7 +182,7 @@ window* CreateWin32WindowEx(const wchar_t* Name, int Width, int Height, WNDPROC 
     WindowClass.hInstance = Instance;
     WindowClass.lpfnWndProc = WindowProc ? WindowProc : DefaultWin32WindowProc;
     WindowClass.lpszClassName = WindowName;
-    WindowClass.hCursor = LoadCursorW(0, IDC_ARROW);
+    WindowClass.hCursor = LoadCursorW(Instance, IDC_ARROW);
 
     if (!RegisterClassExW(&WindowClass))
     {
@@ -226,6 +242,8 @@ void PumpWindowMessages(window* Window)
         DispatchMessageW(&Message);
     }
 }
+
+#ifndef USE_D2D1_API
 
 static IDXGIAdapter* GetBestAvailableAdapter()
 {
@@ -374,6 +392,8 @@ static bool CreateSwapchain(HWND Window, gpu_context* Context, int Width, int He
     return true;
 }
 
+#endif // USE_D2D1_API
+
 gpu_context* InitializeGraphics(HWND Window)
 {
     return InitializeGraphicsEx(Window, 0, 0);
@@ -381,6 +401,8 @@ gpu_context* InitializeGraphics(HWND Window)
 
 gpu_context* InitializeGraphicsEx(HWND Window, int SRGB, int FormatBGRA)
 {
+
+#ifndef USE_D2D1_API
     IDXGIAdapter* Adapter = GetBestAvailableAdapter();
     if (!Adapter)
     {
@@ -440,6 +462,51 @@ gpu_context* InitializeGraphicsEx(HWND Window, int SRGB, int FormatBGRA)
 
     Context->IsInitialized = CreateSwapchain(Window, Context, Rect.right - Rect.left, Rect.bottom - Rect.top, FormatBGRA);
 
+#else
+
+    gpu_context* Context = (gpu_context*)calloc(1, sizeof(gpu_context));
+    if (!Context)
+    {
+        return NULL;
+    }
+
+    Context->UseSRGBFormat = 0;
+
+    HRESULT Result = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &Context->Factory);
+    if (FAILED(Result))
+    {
+        free(Context);
+        return NULL;
+    }
+
+    D2D1_RENDER_TARGET_PROPERTIES RTProps; ZeroStruct(RTProps);
+    RTProps.type = D2D1_RENDER_TARGET_TYPE_HARDWARE;
+
+    DXGI_FORMAT Format = FormatBGRA ? DXGI_FORMAT_B8G8R8A8_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
+    RTProps.pixelFormat = D2D1::PixelFormat(Format, D2D1_ALPHA_MODE_UNKNOWN);
+
+    RTProps.usage = D2D1_RENDER_TARGET_USAGE_NONE;
+    RTProps.minLevel = D2D1_FEATURE_LEVEL_10;
+
+    D2D1_HWND_RENDER_TARGET_PROPERTIES HWRTProps; ZeroStruct(HWRTProps);
+    HWRTProps.hwnd = Window;
+
+    RECT Rect; ZeroStruct(Rect);
+    GetClientRect(Window, &Rect);
+    HWRTProps.pixelSize = D2D1::SizeU(Rect.right - Rect.left, Rect.bottom - Rect.top);
+    HWRTProps.presentOptions = D2D1_PRESENT_OPTIONS_NONE;
+    
+    Result = Context->Factory->CreateHwndRenderTarget(RTProps, HWRTProps, &Context->RenderTarget);
+    if (FAILED(Result))
+    {
+        DestroyGraphics(Context);
+        return NULL;
+    }
+
+    Context->IsInitialized = 1;
+
+#endif
+
     return Context;
 }
 
@@ -449,6 +516,8 @@ int ResizeSwapchain(gpu_context* Context, int Width, int Height)
     {
         return 0;
     }
+
+#ifndef USE_D2D1_API
 
     DXGI_SWAP_CHAIN_DESC Desc; ZeroStruct(Desc);
     Context->Swapchain->GetDesc(&Desc);
@@ -484,6 +553,21 @@ int ResizeSwapchain(gpu_context* Context, int Width, int Height)
     {
         return 0;
     }
+#else
+
+    D2D1_SIZE_U NewSize = { (UINT)Width, (UINT)Height };
+    D2D1_SIZE_U OldSize = Context->RenderTarget->GetPixelSize();
+    
+    if (NewSize.width != OldSize.width || NewSize.height != OldSize.height)
+    {
+        HRESULT Result = Context->RenderTarget->Resize(NewSize);
+        if (FAILED(Result))
+        {
+            return 0;
+        }
+    }
+
+#endif
 
     return 1;
 }
@@ -492,6 +576,7 @@ void DestroyGraphics(gpu_context* Context)
 {
     if (Context)
     {
+#ifndef USE_D2D1_API
         if (Context->BackBuffer)
         {
             Context->BackBuffer->Release();
@@ -511,6 +596,19 @@ void DestroyGraphics(gpu_context* Context)
         {
             Context->Device->Release();
         }
+#else
+
+        if (Context->RenderTarget)
+        {
+            Context->RenderTarget->Release();
+        }
+
+        if (Context->Factory)
+        {
+            Context->Factory->Release();
+        }
+
+#endif
 
         free(Context);
     }
