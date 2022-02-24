@@ -3,7 +3,7 @@
 Single header, STB-style libraries for C/C++. Mostly used in personal projects. All the files are placed in the public-domain.
 
 |library | description
-| --------------------- | -------- | --- | ---------- | --------------------------------
+| --------------------- | --------------------------------
 |**tokenizer.h** | C-like language tokenizer
 |**win32_mixer.h** | Simple mixer for games
 |**quick_timer.h** | Time measurement
